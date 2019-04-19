@@ -17,6 +17,7 @@
 
 extern crate clap;
 use std::process::exit;
+use std::env::current_exe;
 use clap::{App, Arg, AppSettings, ArgGroup};
 use crate::wordlist::lines_from_file;
 use atty::Stream;
@@ -70,7 +71,7 @@ EXAMPLE USE:
     - Run against a website using the default dirble_wordlist.txt from the current directory:
         dirble [address]\n
     - Run with a different wordlist and including .php and .html extensions:
-        dirble [address] -w example_wordlist.txt -X .php,.html\n
+        dirble [address] -w example_wordlist.txt -x .php,.html\n
     - With listable directory scraping enabled:
         dirble [address] --scrape-listable\n
     - Providing a list of extensions and a list of hosts:
@@ -110,10 +111,9 @@ EXAMPLE USE:
                             .short("w")
                             .long("wordlist")
                             .value_name("wordlist")
-                            .help("Sets which wordlist to use")
+                            .help("Sets which wordlist to use, defaults to dirble_wordlist.txt in the same folder as the executable")
                             .takes_value(true)
                             .multiple(true)
-                            .default_value("dirble_wordlist.txt")
                             .display_order(20))
                         .arg(Arg::with_name("extensions")
                             .short("x")
@@ -349,8 +349,16 @@ EXAMPLE USE:
     // Parse wordlist file names into a vector
     let mut wordlists:Vec<String> = Vec::new();
 
-    for wordlist_file in args.values_of("wordlist").unwrap() {
-        wordlists.push(String::from(wordlist_file));
+    if args.is_present("wordlist") {
+        for wordlist_file in args.values_of("wordlist").unwrap() {
+            wordlists.push(String::from(wordlist_file));
+        }
+    }
+    else {
+        let mut exe_path = current_exe()
+            .unwrap_or_else(|error| { println!("Getting directory of exe failed: {}", error); exit(2);});
+        exe_path.set_file_name("dirble_wordlist.txt");
+        wordlists.push(String::from(exe_path.to_str().unwrap()));
     }
 
     // Parse the prefixes into a vector
