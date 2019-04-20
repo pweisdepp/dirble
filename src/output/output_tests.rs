@@ -36,3 +36,23 @@ fn check_directory() {
     assert_eq!(directory, "http://www.example.com/parent/directory");
 
 }
+
+#[test]
+fn check_directory_trailing_slash_removal() {
+
+    let request = RequestResponse {
+        url: String::from("http://www.example.com/parent/directory/"),
+        code: 0,
+        content_len: 0,
+        is_directory: true,
+        is_listable: false,
+        redirect_url: String::from(""),
+        found_from_listable: true,
+        parent_depth: 0
+    };
+
+    let directory = super::directory_name(&request);
+
+    assert_eq!(directory, "http://www.example.com/parent/directory");
+
+}
