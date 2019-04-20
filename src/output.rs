@@ -24,6 +24,9 @@ use crate::output_format;
 use std::error::Error;
 use std::io::{LineWriter, Write};
 
+#[cfg(test)]
+mod output_tests;
+
 // Struct giving access to each current file handle
 // Will be extended in future with handles for different formats
 pub struct FileHandles {
