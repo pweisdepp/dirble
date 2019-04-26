@@ -16,7 +16,7 @@
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    sync::{Arc, mpsc::self},
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };

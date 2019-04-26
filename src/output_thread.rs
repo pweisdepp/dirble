@@ -17,7 +17,7 @@
 
 use crate::arg_parse;
 use std::{
-    sync::{Arc, mpsc::self}
+    sync::{Arc, mpsc}
 };
 use crate::request;
 use crate::output;

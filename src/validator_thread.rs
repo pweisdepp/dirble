@@ -16,7 +16,7 @@
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::request;
-use std::sync::{Arc, mpsc::self};
+use std::sync::{Arc, mpsc};
 use crate::arg_parse;
 use curl::easy::Easy2;
 extern crate rand;
