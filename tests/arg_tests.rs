@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
 extern crate assert_cmd;
 
 #[cfg(test)]
@@ -34,7 +33,23 @@ mod arg_tests {
     fn call_without_valid_http() {
 
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.arg("www.abc.com");
+        cmd.arg("www.example.com");
+        cmd.assert().failure();
+    }
+
+    #[test]
+    fn call_with_negative_threads() {
+
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.arg("-t").arg("-1").arg("http://www.example.com");
+        cmd.assert().failure();
+    }
+
+    #[test]
+    fn call_with_float_threads() {
+
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.arg("-t").arg("0.5").arg("http://www.example.com");
         cmd.assert().failure();
     }
 
