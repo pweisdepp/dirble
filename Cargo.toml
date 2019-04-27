@@ -14,3 +14,6 @@ encoding = "0.2.33"
 atty = "0.2.11"
 colored = "1.7"
 rand = "0.6.5"
+
+[dev-dependencies]
+assert_cmd = "0.11.1"
