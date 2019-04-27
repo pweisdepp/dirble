@@ -15,57 +15,27 @@
 // You should have received a copy of the GNU General Public License
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
-static OUTPUT_WITHOUT_ARGS: &'static str = "error: The following required arguments were not provided:
-    <host|--host-file <host_file>...|--host <host_uri>...>
-";
-
-static OUTPUT_WITHOUT_HTTP: &'static str = "error: Invalid value for '<host_uri>': The provided target URI must start with http:// or https://\n";
+#[macro_use]
+extern crate assert_cmd;
 
 #[cfg(test)]
 mod arg_tests {
     use std::process::Command;
+    use assert_cmd::prelude::*;
 
     #[test]
     fn call_without_host() {
 
-        use crate::OUTPUT_WITHOUT_ARGS;
-
-        let output = Command::new("./target/debug/dirble")
-            .output()
-            .expect("Executing dirble failed");
-
-        let dirble_error = String::from_utf8_lossy(&output.stderr);
-
-        let mut error_lines = dirble_error.lines();
-
-        let mut dirble_output = String::new();
-
-        if let Some(line) = error_lines.next() {
-            dirble_output.push_str(line);
-            dirble_output.push_str("\n");
-        }
-
-        if let Some(line) = error_lines.next() {
-            dirble_output.push_str(line);
-            dirble_output.push_str("\n");
-        }
-
-        assert_eq!(OUTPUT_WITHOUT_ARGS, dirble_output);
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.assert().failure();
     }
 
     #[test]
-    fn call_with_incorrect_url() {
+    fn call_without_valid_http() {
 
-        use crate::OUTPUT_WITHOUT_HTTP;
-
-        let output = Command::new("./target/debug/dirble")
-            .arg("www.abc.com")
-            .output()
-            .expect("Executing dirble failed");
-
-        let dirble_error = String::from_utf8_lossy(&output.stderr);
-
-        assert_eq!(OUTPUT_WITHOUT_HTTP, dirble_error);
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.arg("www.abc.com");
+        cmd.assert().failure();
     }
 
 }
