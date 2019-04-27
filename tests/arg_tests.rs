@@ -22,7 +22,7 @@ static OUTPUT_WITHOUT_ARGS: &'static str = "error: The following required argume
 static OUTPUT_WITHOUT_HTTP: &'static str = "error: Invalid value for '<host_uri>': The provided target URI must start with http:// or https://\n";
 
 #[cfg(test)]
-mod integration {
+mod arg_tests {
     use std::process::Command;
 
     #[test]
