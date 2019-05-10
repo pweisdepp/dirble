@@ -19,19 +19,17 @@ extern crate assert_cmd;
 
 #[cfg(test)]
 mod arg_tests {
-    use std::process::Command;
     use assert_cmd::prelude::*;
+    use std::process::Command;
 
     #[test]
     fn call_without_host() {
-
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         cmd.assert().failure();
     }
 
     #[test]
     fn call_without_valid_http() {
-
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         cmd.arg("www.example.com");
         cmd.assert().failure();
@@ -39,7 +37,6 @@ mod arg_tests {
 
     #[test]
     fn call_with_negative_threads() {
-
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         cmd.arg("-t").arg("-1").arg("http://www.example.com");
         cmd.assert().failure();
@@ -47,9 +44,15 @@ mod arg_tests {
 
     #[test]
     fn call_with_float_threads() {
-
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         cmd.arg("-t").arg("0.5").arg("http://www.example.com");
+        cmd.assert().failure();
+    }
+
+    #[test]
+    fn call_with_no_hostlist() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.arg("-U").arg("hostlist.txt");
         cmd.assert().failure();
     }
 
