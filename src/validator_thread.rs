@@ -16,7 +16,8 @@
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::request;
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, mpsc::self};
+use std::fmt;
 use crate::arg_parse;
 use curl::easy::Easy2;
 extern crate rand;
@@ -28,11 +29,12 @@ use rand::distributions::Alphanumeric;
 pub struct DirectoryInfo {
     pub url:String,
     pub validator:Option<TargetValidator>,
-    pub parent_depth: u32
+    pub parent_depth: u32,
 }
 
 impl DirectoryInfo {
-    pub fn new(url: String, validator: Option<TargetValidator>, parent_depth:u32) -> DirectoryInfo {
+    pub fn new(url: String, validator: Option<TargetValidator>, 
+                parent_depth:u32) -> DirectoryInfo {
         DirectoryInfo {
             url,
             validator,
@@ -55,14 +57,22 @@ impl DirectoryInfo {
 #[derive(Clone)]
 pub struct TargetValidator {
     response_code:u32,
-    response_len:Option<usize>
+    response_len:Option<i32>,
+    diff_response_len:Option<i32>,
+    redirect_url:Option<String>,
+    pub validator_alert: Option<ValidatorAlert>
 }
 
 impl TargetValidator {
-     pub fn new(response_code: u32, response_len: Option<usize>) -> TargetValidator{
+     pub fn new(response_code: u32, response_len: Option<i32>, 
+                diff_response_len: Option<i32>, redirect_url: Option<String>,
+                validator_alert: Option<ValidatorAlert>) -> TargetValidator{
         TargetValidator {
             response_code,
-            response_len
+            response_len,
+            diff_response_len,
+            redirect_url,
+            validator_alert
         }
      }
 
@@ -70,15 +80,27 @@ impl TargetValidator {
      // Returns true if the given request matches the not found definition
      pub fn is_not_found(&self, response: &request::RequestResponse) -> bool {
         // If the responses codes don't match then it is "found"
-        if !(self.response_code == response.code) {
+        if self.response_code != response.code {
             return false
+        }
+
+        // If there's a redirect url set then check that
+        if let Some(redirect_url) = &self.redirect_url {
+            return redirect_url == &response.redirect_url;
         }
 
         // If there is a length in the validator then check against that,
         // otherwise it is "not found"
-        match self.response_len {
-            Some(size) => size == response.content_len,
-            None => true,
+        if let Some(size) = self.response_len {
+            return size == response.content_len as i32;
+        }
+
+        match self.diff_response_len {
+            Some(size) => {
+                let diff = (response.content_len as i32 - response.url.len() as i32).abs();
+                return size == diff;
+            }
+            None => { return true; }
         }
      }
 
@@ -86,12 +108,87 @@ impl TargetValidator {
      // of a not found response
      pub fn summary_text(&self)  -> String {
         let mut output = format!("(CODE:{}", self.response_code);
+
+        if let Some(redirect_url) = &self.redirect_url {
+            output += &format!("|DEST:{}", redirect_url);
+        }
         
         if let Some(length) = self.response_len {
             output += &format!("|SIZE:{}", length);
         }
+
+        if let Some(length) = self.diff_response_len {
+            output += &format!("|DIFF_SIZE:{}", length);
+        }
+
         output + ")"
      }
+
+
+     // Used to determine if things which may be undesirable to
+     // scan should be scanned, checked against options provided by user
+     // Returns true if the folder should be scanned
+     pub fn scan_folder(&self, scan_opts: &arg_parse::ScanOpts) -> bool {
+         if let Some(validator_alert) = &self.validator_alert {
+            match validator_alert {
+                ValidatorAlert::Code401 => { 
+                    return scan_opts.scan_401
+                }
+                ValidatorAlert::Code403 => {
+                    return scan_opts.scan_403
+                }
+                // Placeholder branch for future use
+                ValidatorAlert::RedirectToHTTPS => { 
+                    return true 
+                }
+            }
+        }
+        else {
+            return true
+        }
+    }
+
+    pub fn print_alert(&self) -> String {
+        if let Some(validator_alert) = &self.validator_alert {
+            format!(": {}", validator_alert)
+        }
+        // This branch should never happen because this function should
+        // only be used if scan_folder returned false
+        else {
+            format!("")
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum ValidatorAlert {
+    Code401,
+    Code403,
+    RedirectToHTTPS
+}
+
+impl fmt::Display for ValidatorAlert {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ValidatorAlert::Code401 =>{
+                write!(f, 
+                    "\n    Scanning of directories returning 401 is disabled.\n    \
+                    Use the --scan-401 flag to scan this directory,\n    \
+                    or provide a valid session token or credentials.")
+            },
+            ValidatorAlert::Code403 => {
+                write!(f, 
+                    "\n    Scanning of directories returning 403 is disabled.\n    \
+                    Use the --scan-403 flag to scan this directory,\n    \
+                    or provide valid session token or credentials.")
+            },
+            // Placeholder branch
+            ValidatorAlert::RedirectToHTTPS => {
+                write!(f, 
+                    "The directory redirected to HTTPS")
+            }
+        }
+    }
 }
 
 pub fn validator_thread(rx: mpsc::Receiver<request::RequestResponse>, main_tx: mpsc::Sender<Option<DirectoryInfo>>,
@@ -115,6 +212,25 @@ pub fn validator_thread(rx: mpsc::Receiver<request::RequestResponse>, main_tx: m
                         (response.is_listable && !global_opts.scan_listable) {
                     continue;
                 }
+
+                // If there is a max recursion depth set the check that
+                if let Some(max_recursion_depth) = global_opts.max_recursion_depth {
+                    // Calculate the depth
+                    let mut depth = response.url.matches("/").count() as i32;
+
+                    if response.url.ends_with("/") {
+                        depth -= 1;
+                    }
+
+                    depth -= response.parent_depth as i32;
+
+                    // If the depth exceeds the max_recursion_depth
+                    // Skip scanning this directory
+                    if depth > max_recursion_depth {
+                        continue;
+                    }
+                }
+                //println!("Parent depth: {}, current depth: {}", response.parent_depth, depth);
 
                 // If validation is disabled or if whitelisting is enabled
                 // return a validator of None
@@ -172,35 +288,73 @@ fn make_requests(mut base_url:String, easy: &mut Easy2<request::Collector>) -> V
 fn determine_not_found(responses:Vec<request::RequestResponse>) -> Option<TargetValidator> {
 
     if responses.len() < 3 {
-        return Some(TargetValidator::new(404, None))
+        return Some(TargetValidator::new(404, None, None, None, None))
     }
+
+    let mut validator_alert = None;
 
     let mut code = 404;
     if responses[0].code == responses[1].code 
-        || responses[0].code == responses[2].code {
+            || responses[0].code == responses[2].code {
         code = responses[0].code;
     }
     else if responses[1].code == responses[2].code {
         code = responses[1].code;
     }
 
-    if code == 0 {
-        return None
-    }
-    else if code == 404 {
-        return Some(TargetValidator::new(code, None))        
+    match code {
+        0 => {
+            return None;
+        }
+        301 | 302 => {
+            let mut redirect_url = None;
+            if responses[0].redirect_url == responses[1].redirect_url
+                    || responses[0].redirect_url == responses[2].redirect_url {
+                redirect_url = Some(responses[0].redirect_url.clone());
+            }
+            else if responses[1].redirect_url == responses[2].redirect_url {
+                redirect_url = Some(responses[1].redirect_url.clone());
+            }
+
+            return Some(TargetValidator::new(code, None, None, redirect_url, None))
+        }
+        401 => {
+            validator_alert = Some(ValidatorAlert::Code401);
+        }
+        403 => {
+            validator_alert = Some(ValidatorAlert::Code403);
+        }
+        404 => {
+            return Some(TargetValidator::new(code, None, None, None, None));
+        }
+        _ => {}
     }
 
     let mut response_size = None;
     if responses[0].content_len == responses[1].content_len
-        || responses[0].content_len == responses[2].content_len {
-        response_size = Some(responses[0].content_len);
+            || responses[0].content_len == responses[2].content_len {
+        response_size = Some(responses[0].content_len as i32);
     }
     else if responses[1].content_len == responses[2].content_len {
-        response_size = Some(responses[1].content_len);
+        response_size = Some(responses[1].content_len as i32);
     }
 
-    Some(TargetValidator::new(code, response_size))
+    let mut diff_response_size = None;
+    if response_size == None {
+        let diff_0 = ((responses[0].content_len as i32) - responses[0].url.len() as i32).abs();
+        let diff_1 = ((responses[1].content_len as i32) - responses[1].url.len() as i32).abs();
+        let diff_2 = ((responses[2].content_len as i32) - responses[2].url.len() as i32).abs();
+
+        if diff_0 == diff_1
+            || diff_0 == diff_2 {
+            diff_response_size = Some(diff_0);
+        }
+        else if diff_1 == diff_2 {
+            diff_response_size = Some(diff_1);
+        }
+    }
+
+    Some(TargetValidator::new(code, response_size, diff_response_size, None, validator_alert))
 
 
 }

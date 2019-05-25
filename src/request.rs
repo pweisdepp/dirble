@@ -18,7 +18,7 @@
 use curl::Error;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::arg_parse::GlobalOpts;
+use crate::arg_parse::{GlobalOpts, HttpVerb};
 use percent_encoding::percent_decode;
 extern crate curl;
 use curl::easy::{Easy2, Handler, WriteError};
@@ -63,7 +63,7 @@ pub struct RequestResponse {
 // This function takes an instance of "Easy2", a base URL and a suffix
 // It then makes the request, if the response was not a 404
 // then it will return a RequestResponse struct
-pub fn make_request(mut easy: &mut Easy2<Collector>, url: String) -> RequestResponse{
+pub fn make_request(mut easy: &mut Easy2<Collector>, url: String) -> RequestResponse {
 
     // Set the url in the Easy2 instance
     easy.url(&url).unwrap();
@@ -131,7 +131,9 @@ pub fn make_request(mut easy: &mut Easy2<Collector>, url: String) -> RequestResp
     req_response
 }
 
-pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String, disable_recursion: bool, scrape_listable: bool) -> Vec<RequestResponse> {
+pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String, 
+                    max_recursion_depth: Option<i32>, parent_depth: i32,
+                    scrape_listable: bool) -> Vec<RequestResponse> {
     // Formulate the directory name and make a request to get the contents of the page
     let mut dir_url = String::from(original_url.clone());
     if !dir_url.ends_with("/") {
@@ -185,14 +187,32 @@ pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String, disable
         }
         // If the url ends in a /, it is likely to be a folder
         else {
-            // If recursion is enabled then call this function on the discovered folder
-            // Append the discovered items to the current output
-            if !disable_recursion {
-                output_list.append(&mut listable_check(easy, scraped_url, disable_recursion, scrape_listable));
+            // If the max recursion depth is set, calculate the URL's depth
+            // If the max depth is exceeded then just add the URL to the list
+            // Otherwise call this function on the scraped URL
+            if let Some(max_depth) = max_recursion_depth {
+                let mut depth = scraped_url.matches("/").count() as i32;
+
+                if scraped_url.ends_with("/") {
+                    depth -= 1;
+                }
+
+                depth -= parent_depth as i32;
+
+                // If we've exceeded the max depth, add the url to the values to be returned
+                if depth > max_depth {
+                    output_list.push(fabricate_request_response(scraped_url, true, false));
+                }
+                else {
+                    output_list.append(&mut listable_check(easy, scraped_url, 
+                            max_recursion_depth, parent_depth, scrape_listable));
+                }
             }
-            // If recursion is disabled then just add the url to the values to be returned
+            // If there is no limit to recursion depth
+            // then call this function on the discovered folder
             else {
-                output_list.push(fabricate_request_response(scraped_url, true, false));
+                output_list.append(&mut listable_check(easy, scraped_url, 
+                            max_recursion_depth, parent_depth, scrape_listable));
             }
         }
     }
@@ -205,7 +225,12 @@ pub fn generate_easy(global_opts: &Arc<GlobalOpts>) -> Easy2<Collector>
 {
     // Create a new curl Easy2 instance and set it to use GET requests
     let mut easy = Easy2::new(Collector{contents: Vec::new(), content_len: 0});
-    easy.get(true).unwrap();
+
+    match &global_opts.http_verb {
+        HttpVerb::Get => { easy.get(true).unwrap(); },
+        HttpVerb::Head => { easy.nobody(true).unwrap(); },
+        HttpVerb::Post => { easy.post(true).unwrap(); }
+    }
 
     // Set the timeout of the easy
     easy.timeout(Duration::from_secs(global_opts.timeout as u64)).unwrap();

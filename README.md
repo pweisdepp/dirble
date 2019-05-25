@@ -4,7 +4,7 @@ Dirble is a website directory scanning tool for Windows and Linux. It's designed
 
 # How to Use
 
-Download one of the [precompiled binaries](https://github.com/nccgroup/dirble/releases/latest) for Linux or Windows, or compile the source using Cargo, then run it from a terminal. The default wordlist Dirble uses is dirble_wordlist.txt in the same directory as the executable.
+Download one of the [precompiled binaries](https://github.com/nccgroup/dirble/releases/latest) for Linux, Windows, or Mac, or compile the source using Cargo, then run it from a terminal. The default wordlist Dirble uses is dirble_wordlist.txt in the same directory as the executable.
 
 # Example Uses
 
@@ -53,6 +53,7 @@ To cross-compile for 32- and 64-bit Linux and Windows targets, there is a handy 
 | Tune not found based on size/redirection |    ✅   |   ✅  |     ❌     |     ❌    |
 | URL list                         |    ✅   |   ❌  |     ✅     |     ❌    |
 | User agents                      |    ✅   |   ✅  |     ✅     |     ✅    |
+| Use different HTTP Verbs to scan |    ✅   |   ❌  |     ✅     |     ❌    |
 
 # Performance
 
