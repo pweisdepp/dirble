@@ -23,6 +23,7 @@ use crate::arg_parse::GlobalOpts;
 use crate::output_format;
 use std::error::Error;
 use std::io::{LineWriter, Write};
+use clap::crate_version;
 
 #[cfg(test)]
 mod output_tests;
@@ -188,10 +189,10 @@ fn generate_handle(filename: &String) -> Option<LineWriter<File>>
 pub fn startup_text(global_opts: Arc<GlobalOpts>) {
     if !global_opts.is_terminal { return }
 
-    println!("Dirble");
+    println!("Dirble {}", crate_version!());
     println!("Developed by Izzy Whistlecroft\n");
 
-    println!("Hosts: {}", global_opts.hostnames.clone().join(" "));
+    println!("Targets: {}", global_opts.hostnames.clone().join(" "));
     println!("Wordlists: {}", global_opts.wordlist_files.clone().join(" "));
 
     if global_opts.prefixes.len() == 1 && global_opts.prefixes[0] == "" {

@@ -18,7 +18,7 @@
 extern crate clap;
 use std::process::exit;
 use std::env::current_exe;
-use clap::{App, Arg, AppSettings, ArgGroup};
+use clap::{App, Arg, AppSettings, ArgGroup, crate_version};
 use crate::wordlist::lines_from_file;
 use atty::Stream;
 
@@ -61,7 +61,7 @@ pub fn get_args() -> GlobalOpts
 {
     // Defines all the command line arguments with the Clap module
     let args = App::new("Dirble")
-                        .version("1.3.0")
+                        .version(crate_version!())
                         .author("Developed by Izzy Whistlecroft <Izzy(dot)Whistlecroft(at)nccgroup(dot).com>")
                         .about("Fast directory scanning and scraping tool")
                         .after_help("OUTPUT FORMAT:
@@ -75,13 +75,13 @@ EXAMPLE USE:
         dirble [address] -w example_wordlist.txt -x .php,.html\n
     - With listable directory scraping enabled:
         dirble [address] --scrape-listable\n
-    - Providing a list of extensions and a list of hosts:
-        dirble [address] -X wordlists/web.lst -U hostlist.txt\n
+    - Providing a list of extensions and a list of URIs:
+        dirble [address] -X wordlists/web.lst -U uri-list.txt\n
     - Providing multiple hosts to scan via command line:
         dirble [address] -u [address] -u [address]")
                         .setting(AppSettings::ArgRequiredElseHelp)
                         .arg(Arg::with_name("host")
-                            .value_name("host_uri")
+                            .value_name("uri")
                             .index(1)
                             .help("The URI of the host to scan, optionally supports basic auth with http://user:pass@host:port")
                             .takes_value(true)
@@ -89,8 +89,10 @@ EXAMPLE USE:
                             .display_order(10))
                         .arg(Arg::with_name("extra_hosts")
                             .short("u")
-                            .long("host")
-                            .value_name("host_uri")
+                            .long("uri")
+                            .visible_alias("url")
+                            .alias("host")
+                            .value_name("uri")
                             .help("Additional hosts to scan")
                             .takes_value(true)
                             .multiple(true)
@@ -100,9 +102,12 @@ EXAMPLE USE:
                             .takes_value(true)
                             .multiple(true)
                             .short("U")
-                            .long("host-file")
-                            .help("The filename of a file containing a list of hosts to scan - cookies and headers set will be applied \
-                                to all hosts")
+                            .long("uri-file")
+                            .visible_alias("url-file")
+                            .alias("host-file")
+                            .value_name("uri-file")
+                            .help("The filename of a file containing a list of URIs to scan - cookies and headers set will be applied \
+                                to all URIs")
                             .display_order(10))
                         .group(ArgGroup::with_name("hosts")
                             .required(true)
