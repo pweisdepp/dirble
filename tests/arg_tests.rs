@@ -15,8 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
-extern crate assert_cmd;
-
 #[cfg(test)]
 mod arg_tests {
     use assert_cmd::prelude::*;
@@ -56,4 +54,10 @@ mod arg_tests {
         cmd.assert().failure();
     }
 
+    #[test]
+    fn call_with_no_hostlist2() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.arg("--host-file").arg("hostlist.txt");
+        cmd.assert().failure();
+    }
 }
