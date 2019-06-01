@@ -24,6 +24,9 @@ extern crate curl;
 use curl::easy::{Easy2, Handler, WriteError};
 use crate::content_parse;
 
+#[cfg(test)]
+mod request_tests;
+
 pub struct Collector
 {
     pub contents: Vec<u8>,
@@ -48,7 +51,7 @@ impl Handler for Collector {
 
 // Struct which contains information about a response
 // This is sent back to the main thread
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RequestResponse {
     pub url: String,
     pub code: u32,
@@ -134,8 +137,9 @@ pub fn make_request(mut easy: &mut Easy2<Collector>, url: String) -> RequestResp
 pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String, 
                     max_recursion_depth: Option<i32>, parent_depth: i32,
                     scrape_listable: bool) -> Vec<RequestResponse> {
+    
     // Formulate the directory name and make a request to get the contents of the page
-    let mut dir_url = String::from(original_url.clone());
+    let mut dir_url = original_url.clone();
     if !dir_url.ends_with("/") {
         dir_url = dir_url + "/";
     }
@@ -293,11 +297,7 @@ fn get_content(easy: &mut Easy2<Collector>) -> String
 // Used when items were discovered via scraping
 pub fn fabricate_request_response(url: String, is_directory: bool, is_listable: bool) -> RequestResponse
 {
-    let mut new_url = url.clone();
-    if new_url.ends_with("/") {
-        new_url.pop();
-    }
-    
+
     RequestResponse {
         url: url.clone(),
         code: 0,
