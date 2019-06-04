@@ -15,13 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
-use mockito::{server_address, mock, server_url};
-use curl::easy::Easy2;
+use mockito::{mock, server_url, Matcher};
 use crate::request::*;
 use crate::arg_parse::GlobalOpts;
 use crate::arg_parse::HttpVerb;
 use crate::arg_parse::ScanOpts;
 use std::sync::Arc;
+use std::string::String;
+use std::clone::Clone;
 
 #[test]
 fn test_collector_write_and_clear() {
@@ -31,8 +32,13 @@ fn test_collector_write_and_clear() {
         contents: Vec::new(),
         content_len: 0
     };
+    match collector.write(&bytes) {
+        Ok(_v) => {},
+        Err(e) => {
+            println!("Error writing content to collector buffer");
+        }
+    }
 
-    collector.write(&bytes);
     assert_eq!(collector.contents, bytes);
 
     collector.clear_buffer();
@@ -47,11 +53,8 @@ fn test_basic_request() {
     // get url of dummy http server
     let mut url: String = mockito::server_url().clone();
 
-    // append folder to url
-    url.push_str("/test");
-
     // create mock server
-    let _m = mock("GET", "/test").create();
+    let m = mock("GET", Matcher::Any).create();
 
     let mut options = create_globalopts();
     let options = Arc::new(options);
@@ -60,33 +63,309 @@ fn test_basic_request() {
     let req = make_request(&mut easy, url);
 
     assert_eq!(req.code, 200);
+    m.assert();
+}
+
+#[test]
+fn test_wrong_url() {
+
+    let url: String = mockito::server_url().clone() + "test";
+
+    let _m1 = mock("GET", "/test/")
+        .with_status(10)
+        .create();
+
+    let options = Arc::new(create_globalopts());
+    let mut easy = generate_easy(&options);
+
+    let result = make_request(&mut easy, url.clone());
+
+    let mut request = fabricate_request_response(url, false, false);
+    request.found_from_listable = false;
+
+    assert_eq!(result, request);
 
 }
 
 #[test]
-fn test_fabricate_response() {
+fn test_redirect_and_listable() {
 
-    let request = RequestResponse {
-        url: String::from("http://www.example.com/"),
-        code: 0,
-        content_len: 0,
-        is_directory: false,
-        is_listable: false,
-        redirect_url: String::from(""),
-        found_from_listable: true,
-        parent_depth: 0
-    };
+    // get url of dummy http server
+    let mut url: String = mockito::server_url().clone();
 
-    assert_eq!(request, fabricate_request_response(String::from("http://www.example.com/"), false, false));
+    // append folder to url
+    url.push_str("/test");
+
+    let new_url = url.clone() + "/";
+
+    // create mock server with directory
+    let m1 = mock("GET", "/test")
+        .with_status(301)
+        .with_header("Location", &new_url)
+        .create();
+
+    let m2 = mock("GET", "/test/")
+        .with_status(200)
+        .with_body("parent directory")
+        .create();
+
+    let options = Arc::new(create_globalopts());
+    let mut easy = generate_easy(&options);
+
+    let req = make_request(&mut easy, url.clone());
+
+    assert_eq!(req.code, 301);
+    m1.assert();
+
+    let result = listable_check(&mut easy, url.clone(), Some(2), 0, true);
+
+    let result = &result[0];
+
+    let mut request = fabricate_request_response(url + "/", true, true);
+    request.code = 200;
+    request.found_from_listable = false;
+    request.content_len = "parent directory".len();
+
+    assert_eq!(result, &request);
+    m2.assert();
+}
+
+#[test]
+fn test_unlistable() {
+
+    // get url of dummy http server
+    let mut url: String = mockito::server_url().clone();
+
+    // append folder to url
+    url.push_str("/test");
+
+    // create mock server with directory
+    let m1 = mock("GET", "/test/")
+        .with_status(200)
+        .with_body("no match")
+        .create();
+
+    let mut options = Arc::new(create_globalopts());
+    let mut easy = generate_easy(&options);
+
+    let req = make_request(&mut easy, url.clone());
+
+
+    let result = listable_check(&mut easy, url.clone(), Some(2), 0, true);
+
+    let result = &result[0];
+
+    let mut request = fabricate_request_response(url + "/", true, false);
+    request.code = 200;
+    request.found_from_listable = false;
+    request.content_len = "no match".len();
+
+    assert_eq!(result, &request);
+    m1.assert();
+}
+
+#[test]
+fn test_folder() {
+
+    // get url of dummy http server
+    let mut url: String = mockito::server_url().clone();
+
+    // append folder to url
+    url.push_str("/test");
+
+    // create mock server with directory
+    let m1 = mock("GET", "/test/")
+        .with_status(10)
+        .with_body("no match")
+        .create();
+
+    let mut options = Arc::new(create_globalopts());
+    let mut easy = generate_easy(&options);
+
+    let result = listable_check(&mut easy, url.clone(), Some(2), 0, true);
+
+    let result = &result[0];
+
+    let mut request = fabricate_request_response(url + "/", true, false);
+    request.code = 10;
+    request.found_from_listable = false;
+    request.content_len = "no match".len();
+
+    assert_eq!(result, &request);
+    m1.assert();
+}
+
+#[test]
+fn test_scrapable_recursive() {
+
+    let url: String = mockito::server_url().clone() + "/test/";
+
+    let url_to_scrape1 = r#" parent directory <a href="http://127.0.0.1:1234/test/dir1/">"#;
+    let url_to_scrape2 = r#" parent directory <a href="http://127.0.0.1:1234/test/dir1/dir2/">"#;
+    let url_to_scrape3 = r#" parent directory <a href="http://127.0.0.1:1234/test/dir1/dir2/file">"#;
+
+
+    let m1 = mock("GET", "/test/")
+        .with_status(200)
+        .with_body(&url_to_scrape1)
+        .create();
+
+    let m2 = mock("GET", "/test/dir1/")
+        .with_status(200)
+        .with_body(&url_to_scrape2)
+        .create();
+
+    let m3 = mock("GET", "/test/dir1/dir2/")
+        .with_status(200)
+        .with_body(url_to_scrape3)
+        .create();
+
+    let m4 = mock("GET", "/test/dir1/dir2/file")
+        .with_status(200)
+        .create();
+
+    let mut options = create_globalopts();
+    options.scrape_listable = true;
+    options.max_recursion_depth = None;
+
+    let options = Arc::new(options);
+
+    let mut easy = generate_easy(&options);
+
+    let result: Vec<RequestResponse> = listable_check(&mut easy, url.clone(), None, 0, true);
+
+    m1.assert();
+    m2.assert();
+    m3.assert();
 
 }
 
+#[test]
+fn test_scrapable_recursive_max_depth() {
 
-fn generate_empty_easy() -> Easy2<Collector> {
+    let url: String = mockito::server_url().clone() + "/test/";
 
-    let easy = Easy2::new(Collector{contents: Vec::new(), content_len: 0});
+    let url_to_scrape1 = r#" parent directory <a href="http://127.0.0.1:1234/test/dir1/">"#;
+    let url_to_scrape2 = r#" parent directory <a href="http://127.0.0.1:1234/test/dir1/dir2/">"#;
+    let url_to_scrape3 = r#" parent directory <a href="http://127.0.0.1:1234/test/dir1/dir2/file">"#;
 
-    easy
+    let m1 = mock("GET", "/test/")
+        .with_status(200)
+        .with_body(&url_to_scrape1)
+        .create();
+
+    let m2 = mock("GET", "/test/dir1/")
+        .with_status(200)
+        .with_body(&url_to_scrape2)
+        .create();
+
+    let m3 = mock("GET", "/test/dir1/dir2/")
+        .with_status(200)
+        .with_body(url_to_scrape3)
+        .create();
+
+    let m4 = mock("GET", "/test/dir1/dir2/file")
+        .with_status(200)
+        .create();
+
+    let mut options = create_globalopts();
+    options.scrape_listable = true;
+
+    let options = Arc::new(options);
+
+    let mut easy = generate_easy(&options);
+
+    let _result: Vec<RequestResponse> = listable_check(&mut easy, url.clone(), Some(4), 0, true);
+
+    m1.assert();
+    m2.assert();
+
+}
+
+#[test]
+fn test_easy_options() {
+
+    // get url of dummy http server
+    let url: String = mockito::server_url().clone();
+
+    // create mock server
+    let _m1 = mock("HEAD", "/")
+        .with_status(201)
+        .create();
+
+    let mut options = create_globalopts();
+
+    // modify defaults
+    options.http_verb = HttpVerb::Head;
+    options.ignore_cert = true;
+    options.user_agent = Some(String::from("Mozilla/5.0"));
+    options.username = Some(String::from("username"));
+    options.password = Some(String::from("password"));
+    options.cookies = Some(String::from("cookie"));
+
+
+    let mut header_list: Vec<String> = Vec::new();
+    header_list.push(String::from("User-Agent: Mozilla/5.0"));
+    options.headers = Some(header_list);
+
+    let options = Arc::new(options);
+
+    let mut easy = generate_easy(&options);
+
+    let result = make_request(&mut easy, url.clone());
+
+    let mut request = fabricate_request_response(url, false, false);
+    request.code = 201;
+    request.found_from_listable = false;
+
+    assert_eq!(result, request);
+
+}
+
+#[test]
+fn test_proxy_option() {
+
+    // get url of dummy http server
+    let url: String = mockito::server_url().clone();
+
+    // create mock server
+    let m1 = mock("GET", Matcher::Any)
+        .create();
+
+    let mut options = create_globalopts();
+    options.proxy_enabled = true;
+    options.proxy_address = url.clone();
+
+    let options = Arc::new(options);
+
+    let mut easy = generate_easy(&options);
+
+    let _result = make_request(&mut easy, url);
+
+    m1.assert();
+
+}
+
+#[test]
+fn test_post_request() {
+
+    // get url of dummy http server
+    let url: String = mockito::server_url().clone();
+
+    // create mock server
+    let m1 = mock("POST", Matcher::Any)
+        .create();
+
+    let mut options = create_globalopts();
+    options.http_verb = HttpVerb::Post;
+    let options = Arc::new(options);
+
+    let mut easy = generate_easy(&options);
+
+    let _result = make_request(&mut easy, url.clone());
+
+    m1.assert();
+
 }
 
 fn create_globalopts() -> GlobalOpts {
