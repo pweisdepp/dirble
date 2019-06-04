@@ -55,7 +55,7 @@ fn test_basic_request() {
     let url: String = mockito::server_url().clone();
 
     // create mock server
-    let m = mock("GET", Matcher::Any)
+    let m = mock("GET", "/")
         .with_status(200)
         .create();
 
@@ -68,6 +68,7 @@ fn test_basic_request() {
     let req = make_request(&mut easy, url);
     assert_eq!(req.code, 200);
 
+    // Check that the mock server has delivered the request
     m.assert();
 }
 
