@@ -137,7 +137,7 @@ pub fn make_request(mut easy: &mut Easy2<Collector>, url: String) -> RequestResp
 pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String, 
                     max_recursion_depth: Option<i32>, parent_depth: i32,
                     scrape_listable: bool) -> Vec<RequestResponse> {
-    
+
     // Formulate the directory name and make a request to get the contents of the page
     let mut dir_url = original_url.clone();
     if !dir_url.ends_with("/") {
@@ -150,8 +150,7 @@ pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String,
     match response.code {
         // If a found response was returned then check if the directory is listable or not
         200 => {
-            let listable = content.contains("parent directory") || content.contains("up to ") 
-                || content.contains("directory listing for");
+            let listable = content.contains("parent directory") || content.contains("up to ") || content.contains("directory listing for");
 
             if listable{
                 response.is_listable = true;
@@ -186,8 +185,7 @@ pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String,
         // If the scraped url doesn't end in a /, it's unlikely to be a folder
         // Add it to the list of found URLs to be returned
         if !scraped_url.ends_with("/") {
-            output_list.push(fabricate_request_response(
-                scraped_url, false, false));
+            output_list.push(fabricate_request_response(scraped_url, false, false));
         }
         // If the url ends in a /, it is likely to be a folder
         else {
@@ -208,15 +206,13 @@ pub fn listable_check(easy: &mut Easy2<Collector>, original_url: String,
                     output_list.push(fabricate_request_response(scraped_url, true, false));
                 }
                 else {
-                    output_list.append(&mut listable_check(easy, scraped_url, 
-                            max_recursion_depth, parent_depth, scrape_listable));
+                    output_list.append(&mut listable_check(easy, scraped_url, max_recursion_depth, parent_depth, scrape_listable));
                 }
             }
             // If there is no limit to recursion depth
             // then call this function on the discovered folder
             else {
-                output_list.append(&mut listable_check(easy, scraped_url, 
-                            max_recursion_depth, parent_depth, scrape_listable));
+                output_list.append(&mut listable_check(easy, scraped_url, max_recursion_depth, parent_depth, scrape_listable));
             }
         }
     }
