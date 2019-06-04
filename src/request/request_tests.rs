@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Dirble.  If not, see <https://www.gnu.org/licenses/>.
 
-use mockito::{mock, server_url, Matcher};
+use mockito::{mock, Matcher};
 use crate::request::*;
 use crate::arg_parse::GlobalOpts;
 use crate::arg_parse::HttpVerb;
@@ -34,8 +34,8 @@ fn test_collector_write_and_clear() {
     };
     match collector.write(&bytes) {
         Ok(_v) => {},
-        Err(e) => {
-            println!("Error writing content to collector buffer");
+        Err(_e) => {
+            println!("Error writing to collector buffer");
         }
     }
 
@@ -43,7 +43,7 @@ fn test_collector_write_and_clear() {
 
     collector.clear_buffer();
 
-    let mut vector: Vec<u8> = Vec::new();
+    let vector: Vec<u8> = Vec::new();
     assert_eq!(collector.contents, vector);
 }
 
@@ -51,12 +51,12 @@ fn test_collector_write_and_clear() {
 fn test_basic_request() {
 
     // get url of dummy http server
-    let mut url: String = mockito::server_url().clone();
+    let url: String = mockito::server_url().clone();
 
     // create mock server
     let m = mock("GET", Matcher::Any).create();
 
-    let mut options = create_globalopts();
+    let options = create_globalopts();
     let options = Arc::new(options);
     let mut easy = generate_easy(&options);
 
@@ -145,11 +145,10 @@ fn test_unlistable() {
         .with_body("no match")
         .create();
 
-    let mut options = Arc::new(create_globalopts());
+    let options = Arc::new(create_globalopts());
     let mut easy = generate_easy(&options);
 
-    let req = make_request(&mut easy, url.clone());
-
+    let _req = make_request(&mut easy, url.clone());
 
     let result = listable_check(&mut easy, url.clone(), Some(2), 0, true);
 
@@ -179,7 +178,7 @@ fn test_folder() {
         .with_body("no match")
         .create();
 
-    let mut options = Arc::new(create_globalopts());
+    let options = Arc::new(create_globalopts());
     let mut easy = generate_easy(&options);
 
     let result = listable_check(&mut easy, url.clone(), Some(2), 0, true);
@@ -220,7 +219,7 @@ fn test_scrapable_recursive() {
         .with_body(url_to_scrape3)
         .create();
 
-    let m4 = mock("GET", "/test/dir1/dir2/file")
+    let _m4 = mock("GET", "/test/dir1/dir2/file")
         .with_status(200)
         .create();
 
@@ -232,7 +231,7 @@ fn test_scrapable_recursive() {
 
     let mut easy = generate_easy(&options);
 
-    let result: Vec<RequestResponse> = listable_check(&mut easy, url.clone(), None, 0, true);
+    let _result: Vec<RequestResponse> = listable_check(&mut easy, url.clone(), None, 0, true);
 
     m1.assert();
     m2.assert();
@@ -259,12 +258,12 @@ fn test_scrapable_recursive_max_depth() {
         .with_body(&url_to_scrape2)
         .create();
 
-    let m3 = mock("GET", "/test/dir1/dir2/")
+    let _m3 = mock("GET", "/test/dir1/dir2/")
         .with_status(200)
         .with_body(url_to_scrape3)
         .create();
 
-    let m4 = mock("GET", "/test/dir1/dir2/file")
+    let _m4 = mock("GET", "/test/dir1/dir2/file")
         .with_status(200)
         .create();
 
