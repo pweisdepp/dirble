@@ -32,6 +32,7 @@ fn test_collector_write_and_clear() {
         contents: Vec::new(),
         content_len: 0
     };
+
     match collector.write(&bytes) {
         Ok(_v) => {},
         Err(_e) => {
@@ -54,20 +55,24 @@ fn test_basic_request() {
     let url: String = mockito::server_url().clone();
 
     // create mock server
-    let m = mock("GET", Matcher::Any).create();
+    let m = mock("GET", Matcher::Any)
+        .with_status(200)
+        .create();
 
+    // Create dummy global options and wrap in an Arc pointer
     let options = create_globalopts();
     let options = Arc::new(options);
+
+    // Generate easy, make the request, and check that the response from server is 200
     let mut easy = generate_easy(&options);
-
     let req = make_request(&mut easy, url);
-
     assert_eq!(req.code, 200);
+
     m.assert();
 }
 
 #[test]
-fn test_wrong_url() {
+fn test_request_with_wrong_url() {
 
     let url: String = mockito::server_url().clone() + "test";
 
@@ -88,7 +93,7 @@ fn test_wrong_url() {
 }
 
 #[test]
-fn test_redirect_and_listable() {
+fn test_with_redirect_and_listable_dir() {
 
     // get url of dummy http server
     let mut url: String = mockito::server_url().clone();
@@ -131,7 +136,7 @@ fn test_redirect_and_listable() {
 }
 
 #[test]
-fn test_unlistable() {
+fn test_unlistable_folder() {
 
     // get url of dummy http server
     let mut url: String = mockito::server_url().clone();
@@ -163,6 +168,7 @@ fn test_unlistable() {
     m1.assert();
 }
 
+// same as above but with a non-200 status code
 #[test]
 fn test_folder() {
 
@@ -194,6 +200,7 @@ fn test_folder() {
     m1.assert();
 }
 
+// test functionality of the scraper
 #[test]
 fn test_scrapable_recursive() {
 
@@ -239,6 +246,7 @@ fn test_scrapable_recursive() {
 
 }
 
+// same as above but with max recursion depth of 4
 #[test]
 fn test_scrapable_recursive_max_depth() {
 
@@ -281,6 +289,7 @@ fn test_scrapable_recursive_max_depth() {
 
 }
 
+// test a basic request with different options
 #[test]
 fn test_easy_options() {
 
@@ -301,7 +310,6 @@ fn test_easy_options() {
     options.username = Some(String::from("username"));
     options.password = Some(String::from("password"));
     options.cookies = Some(String::from("cookie"));
-
 
     let mut header_list: Vec<String> = Vec::new();
     header_list.push(String::from("User-Agent: Mozilla/5.0"));
@@ -367,6 +375,7 @@ fn test_post_request() {
 
 }
 
+// private helper function to create some default options
 fn create_globalopts() -> GlobalOpts {
     GlobalOpts {
         hostnames: Vec::new(),
