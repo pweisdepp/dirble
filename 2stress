@@ -1,0 +1,17 @@
+
+
+PASSED = 0
+for (( i =1; i<=$1; i++))
+do
+echo "Starting Stress Test"
+if cargo test | grep 'FAILED'; then
+   echo "Tests failed"
+else
+   echo "Tests passed"
+   ((PASSED++))
+fi
+done
+
+if [ $# -eq 2 ]; then
+   mail -s "Tests ran $1 times and passed $PASSED times" eakinsr@cs1.seattleu.edu,weisdepp@seattleu.edu,$2@cs1.seattleu.edu < /dev/null
+fi
