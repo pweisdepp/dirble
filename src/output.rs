@@ -25,8 +25,6 @@ use std::error::Error;
 use std::io::{LineWriter, Write};
 use clap::crate_version;
 
-#[cfg(test)]
-mod output_tests;
 
 // Struct giving access to each current file handle
 // Will be extended in future with handles for different formats
