@@ -63,7 +63,8 @@ fn test_basic_request() {
     let options = create_globalopts();
     let options = Arc::new(options);
 
-    // Generate easy, make the request, and check that the response from server is 200
+    // Generate easy, make the request, and check
+    // that the response from server is 200
     let mut easy = generate_easy(&options);
     let req = make_request(&mut easy, url);
     assert_eq!(req.code, 200);
